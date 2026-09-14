@@ -690,6 +690,9 @@ function showIosHint() {
 async function boot() {
   applyTheme(localStorage.getItem('loppis.theme') || 'light');
   applyChrome();
+  renderChips();
+  renderDateChips();
+  statusEl.textContent = 'Laster katalog…';
   offline = useOfflinePwa();
   if (offline) {
     try {
@@ -761,7 +764,7 @@ async function boot() {
     if (dial) dial.style.transform = `rotate(${-heading}deg)`;
   });
   void load();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=4');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5');
 }
 
 void boot();
