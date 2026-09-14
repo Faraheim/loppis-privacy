@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1c1410" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Loppis" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Loppis</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="stylesheet" href="./vendor/leaflet.css" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
+  </head>
+  <body>
+    <div id="iosHint" class="ios-hint" hidden>
+      <p>iPhone: Safari → Del → <strong>Legg til på Hjem-skjerm</strong></p>
+      <button type="button" class="ghost compact" id="iosHintClose">OK</button>
+    </div>
+    <header class="chrome">
+      <div class="chrome-row">
+        <h1>Loppis</h1>
+        <p class="lead" id="status">…</p>
+        <button type="button" class="icon-btn" id="favBtn" aria-label="Favoritter">♡</button>
+        <button type="button" class="icon-btn" id="settingsBtn" aria-label="Innstillinger">⚙</button>
+      </div>
+      <div class="search-row">
+        <input id="q" type="search" placeholder="Søk sted, butikk eller kommune" autocomplete="off" />
+      </div>
+      <div class="chip-scroll">
+        <div class="chip-row" id="kindChips"></div>
+        <div class="chip-row" id="dateChips"></div>
+      </div>
+      <p class="date-hint" id="dateHint" hidden>Dato</p>
+      <div class="date-custom" id="dateCustom" hidden>
+        <label>Fra <input id="dateFrom" type="date" /></label>
+        <label>Til <input id="dateTo" type="date" /></label>
+      </div>
+    </header>
+
+    <main>
+      <section id="map" class="map" aria-label="Kart"></section>
+      <button type="button" class="compass" id="compassBtn" aria-label="Min posisjon">
+        <span class="compass-dial" id="compassDial">
+          <span class="compass-n">N</span>
+          <span class="compass-needle"></span>
+        </span>
+      </button>
+      <section id="listWrap" class="list-wrap">
+        <details id="listFold">
+          <summary id="listSummary">Steder</summary>
+          <section id="list" class="list" aria-live="polite"></section>
+        </details>
+      </section>
+    </main>
+
+    <aside id="sheet" class="sheet" hidden>
+      <div class="sheet-head">
+        <p class="kind" id="sheetKind"></p>
+        <button type="button" class="ghost compact" id="sheetClose" aria-label="Lukk">Lukk</button>
+      </div>
+      <h2 id="sheetTitle"></h2>
+      <p class="meta" id="sheetMeta"></p>
+      <p class="hours" id="sheetHours"></p>
+      <button type="button" class="ghost compact" id="sheetFav">♡ Favoritt</button>
+      <div id="sheetLinks" class="sheet-links"></div>
+    </aside>
+
+    <aside id="settingsPanel" class="panel" hidden>
+      <div class="sheet-head">
+        <h2 id="settingsTitle">Innstillinger</h2>
+        <button type="button" class="ghost compact" id="settingsClose">Ferdig</button>
+      </div>
+      <p class="panel-label" id="langLabel">Språk</p>
+      <div class="flag-row">
+        <button type="button" class="flag-btn" id="langNb" data-lang="nb" aria-label="Norsk">
+          <img src="./flag-nb.svg" alt="" width="36" height="26" />
+          <span>Norsk</span>
+        </button>
+        <button type="button" class="flag-btn" id="langEn" data-lang="en" aria-label="English">
+          <img src="./flag-en.svg" alt="" width="36" height="26" />
+          <span>English</span>
+        </button>
+      </div>
+      <p class="panel-label" id="themeLabel">Utseende</p>
+      <div class="flag-row">
+        <button type="button" class="ghost" id="themeDark">Mørk</button>
+        <button type="button" class="ghost" id="themeLight">Lys</button>
+      </div>
+      <button type="button" class="ghost" id="refreshBtn">Oppdater loppemarked</button>
+      <div class="refresh-track" id="refreshTrack" hidden>
+        <div class="refresh-fill" id="refreshFill"></div>
+        <span id="refreshPct">0%</span>
+      </div>
+    </aside>
+
+    <aside id="favPanel" class="panel" hidden>
+      <div class="sheet-head">
+        <h2 id="favTitle">Favoritter</h2>
+        <button type="button" class="ghost compact" id="favClose">Ferdig</button>
+      </div>
+      <div id="favList" class="list"></div>
+    </aside>
+
+    <footer>© OpenStreetMap</footer>
+    <script src="./vendor/leaflet.js"></script>
+    <script>window.LOPPIS_OFFLINE=true;</script>
+    <script src="./app.js?v=4" type="module"></script>
+  </body>
+</html>
