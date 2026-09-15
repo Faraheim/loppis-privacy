@@ -1,4 +1,4 @@
-const CACHE = 'loppis-pwa-v7';
+const CACHE = 'loppis-pwa-v8';
 const SHELL = [
   './',
   './index.html',

@@ -1,11 +1,11 @@
-import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js';
+import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js?v=7';
 import {
   catalogFromFetched,
   HOOPLA_CITIES,
   hooplaEventsUrl,
   isGitCatalogUrl,
   LIVE_HTML_SOURCES,
-} from './shared/liveCalendars.js';
+} from './shared/liveCalendars.js?v=7';
 
 const API = (window.LOPPIS_API || localStorage.getItem('loppisApi') || 'http://127.0.0.1:8795').replace(
   /\/$/,
