@@ -1,4 +1,4 @@
-import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js?v=10';
+import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js?v=11';
 import {
   catalogFromFetched,
   HOOPLA_CITIES,
@@ -6,7 +6,7 @@ import {
   isGitCatalogUrl,
   LIVE_FETCH_HEADERS,
   LIVE_HTML_SOURCES,
-} from './shared/liveCalendars.js?v=10';
+} from './shared/liveCalendars.js?v=11';
 
 const API = (window.LOPPIS_API || localStorage.getItem('loppisApi') || 'http://127.0.0.1:8795').replace(
   /\/$/,
@@ -881,7 +881,7 @@ async function boot() {
     if (dial) dial.style.transform = `rotate(${-heading}deg)`;
   });
   void load();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=10');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=11');
 }
 
 void boot();

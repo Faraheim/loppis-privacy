@@ -107,7 +107,7 @@ export function isGitCatalogUrl(url) {
 
 export const LIVE_FETCH_HEADERS = {
   Accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
-  'User-Agent': 'Loppis/0.1.2 (Norway flea-market map; user-device calendar pull)',
+  'User-Agent': 'Loppis/0.1.3 (Norway flea-market map; user-device calendar pull)',
 };
 
 export function hooplaEventsUrl(city) {
