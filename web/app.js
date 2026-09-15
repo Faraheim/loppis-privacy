@@ -1,4 +1,11 @@
-import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa } from './offline.js';
+import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js';
+import {
+  catalogFromFetched,
+  HOOPLA_CITIES,
+  hooplaEventsUrl,
+  isGitCatalogUrl,
+  LIVE_HTML_SOURCES,
+} from './shared/liveCalendars.js';
 
 const API = (window.LOPPIS_API || localStorage.getItem('loppisApi') || 'http://127.0.0.1:8795').replace(
   /\/$/,
@@ -495,43 +502,84 @@ function setRefreshUi(running, percent, label) {
   pct.textContent = running ? `${Math.round(percent || 0)}%` : label || '';
 }
 
+async function fetchPublicText(url) {
+  if (isGitCatalogUrl(url)) throw new Error('git_catalog_forbidden');
+  const res = await fetch(url, { signal: AbortSignal.timeout?.(25_000) });
+  if (!res.ok) throw new Error(`http ${res.status}`);
+  return res.text();
+}
+
+async function fetchPublicJson(url) {
+  if (isGitCatalogUrl(url)) throw new Error('git_catalog_forbidden');
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout?.(25_000),
+  });
+  if (!res.ok) throw new Error(`http ${res.status}`);
+  return res.json();
+}
+
 async function refreshList() {
   setRefreshUi(true, 5, '');
-  statusEl.textContent = 'Henter ny liste…';
+  statusEl.textContent = 'Henter kalendere…';
   try {
-    if (offline) {
-      setRefreshUi(true, 20, '');
-      const n = await loadOfflineStore(`./offline-store.json?t=${Date.now()}`);
-      setRefreshUi(true, 80, '');
-      await load();
-      statusEl.textContent = `Liste oppdatert — ${n} steder`;
-      setRefreshUi(false, 100, 'Ferdig');
+    const local = getCatalogSnapshot();
+    const htmlBySource = {};
+    const failedSourceIds = [];
+    const total = LIVE_HTML_SOURCES.length + HOOPLA_CITIES.length + 1;
+    let done = 0;
+    for (const src of LIVE_HTML_SOURCES) {
+      setRefreshUi(true, Math.round((done / total) * 90), src.id);
+      try {
+        htmlBySource[src.id] = await fetchPublicText(src.url);
+      } catch {
+        failedSourceIds.push(src.id);
+      }
+      done += 1;
+    }
+    const hooplaByCity = {};
+    let hooplaOk = 0;
+    for (const city of HOOPLA_CITIES) {
+      setRefreshUi(true, Math.round((done / total) * 90), `Hoopla ${city}`);
+      try {
+        hooplaByCity[city] = await fetchPublicJson(hooplaEventsUrl(city));
+        hooplaOk += 1;
+      } catch {
+        /* city fail ok */
+      }
+      done += 1;
+    }
+    if (!hooplaOk) failedSourceIds.push('hoopla');
+    const htmlOk = LIVE_HTML_SOURCES.filter((s) => htmlBySource[s.id]).length;
+    if (!htmlOk && !hooplaOk) {
+      statusEl.textContent = 'Klarte ikke å hente kalendere. Sjekk nettet.';
+      setRefreshUi(false, 0, '');
       return;
     }
-    const start = await fetch(`${API}/v1/refresh`, { method: 'POST' }).then((r) => r.json());
-    setRefreshUi(true, start.percent || 1, '');
-    let last = start;
-    for (let i = 0; i < 900; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      last = await fetch(`${API}/v1/refresh`).then((r) => r.json());
-      setRefreshUi(Boolean(last.running), last.percent || 0, last.stage || '');
-      statusEl.textContent = last.stage
-        ? `${last.stage} · ${Math.round(last.percent || 0)}%`
-        : statusEl.textContent;
-      if (!last.running) break;
-    }
-    if (last.ok) {
-      statusEl.textContent = `Liste oppdatert — ${last.places ?? 0} steder`;
-      setRefreshUi(false, 100, 'Ferdig');
-      await load();
-    } else {
-      statusEl.textContent = last.error || 'Oppdatering feilet';
-      setRefreshUi(false, last.percent || 0, 'Feilet');
-    }
+    setRefreshUi(true, 92, 'Oppdaterer kart');
+    const { store } = catalogFromFetched({
+      htmlBySource,
+      hooplaByCity,
+      localPlaces: local.places,
+      localSources: local.sources,
+      failedSourceIds,
+    });
+    const n = applyOfflineStore(store);
+    persistOverlay(store);
+    await load();
+    const fleas = store.places.filter((p) => p.attrs?.kind === 'flea_market').length;
+    statusEl.textContent = fleas
+      ? `Liste oppdatert — ${n} steder (${fleas} loppemarked)`
+      : `Liste oppdatert — ${n} steder`;
+    setRefreshUi(false, 100, 'Ferdig');
   } catch (err) {
-    statusEl.textContent = 'Klarte ikke å hente ny liste. Sjekk nettet.';
-    setRefreshUi(false, 0, 'Feilet');
+    statusEl.textContent = lastError(err);
+    setRefreshUi(false, 0, '');
   }
+}
+
+function lastError(err) {
+  return err?.message || 'Oppdatering feilet';
 }
 
 function applyTheme(mode) {

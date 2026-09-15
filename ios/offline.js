@@ -95,23 +95,52 @@ function googleStreetViewUrl(lat, lon) {
   return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lon}`;
 }
 
-export async function loadOfflineStore(url = './offline-store.json') {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`offline-store ${res.status}`);
-  const data = await res.json();
+export function offlinePlaceCount() {
+  return store.places.length;
+}
+
+export function getCatalogSnapshot() {
+  return store;
+}
+
+export function applyOfflineStore(data) {
   store = {
-    places: Array.isArray(data.places) ? data.places : [],
-    sources: (Array.isArray(data.sources) ? data.sources : []).map((s) => ({
+    places: Array.isArray(data?.places) ? data.places : [],
+    sources: (Array.isArray(data?.sources) ? data.sources : []).map((s) => ({
       ...s,
       attribution: stripPersonNames(s.attribution || ''),
     })),
-    updatedAt: data.updatedAt || new Date().toISOString(),
+    updatedAt: data?.updatedAt || new Date().toISOString(),
   };
   return store.places.length;
 }
 
-export function offlinePlaceCount() {
-  return store.places.length;
+const OVERLAY_KEY = 'loppis.catalog.overlay';
+
+export function persistOverlay(data) {
+  try {
+    localStorage.setItem(OVERLAY_KEY, JSON.stringify(data));
+  } catch {
+    /* quota */
+  }
+}
+
+export async function loadOfflineStore(url = './offline-store.json') {
+  try {
+    const raw = localStorage.getItem(OVERLAY_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data?.places) && data.places.length) {
+        return applyOfflineStore(data);
+      }
+    }
+  } catch {
+    /* fall through to bundled */
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`offline-store ${res.status}`);
+  const data = await res.json();
+  return applyOfflineStore(data);
 }
 
 function toFeature(place, extra = {}) {
