@@ -13,7 +13,7 @@
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="stylesheet" href="./vendor/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=5" />
+    <link rel="stylesheet" href="./styles.css?v=6" />
   </head>
   <body>
     <div id="iosHint" class="ios-hint" hidden>
@@ -25,14 +25,23 @@
         <h1>Loppis</h1>
         <p class="lead" id="status">Laster…</p>
         <button type="button" class="icon-btn" id="favBtn" aria-label="Favoritter">♡</button>
+        <button type="button" class="icon-btn" id="refreshChromeBtn" aria-label="Oppdater">↻</button>
         <button type="button" class="icon-btn" id="settingsBtn" aria-label="Innstillinger">⚙</button>
       </div>
       <div class="search-row">
-        <input id="q" type="search" placeholder="Søk sted, butikk eller kommune" autocomplete="off" />
+        <input id="q" type="text" placeholder="Søk sted, butikk eller kommune" autocomplete="off" />
       </div>
       <div class="chip-scroll">
         <div class="chip-row" id="kindChips"></div>
         <div class="chip-row" id="dateChips"></div>
+      </div>
+      <div class="km-row">
+        <label for="kmRange" id="kmLabel">Avstand av</label>
+        <input id="kmRange" type="range" min="0" max="100" step="5" value="0" />
+      </div>
+      <div class="refresh-track" id="refreshTrack" hidden>
+        <div class="refresh-fill" id="refreshFill"></div>
+        <span id="refreshPct">0%</span>
       </div>
       <p class="date-hint" id="dateHint" hidden>Dato</p>
       <div class="date-custom" id="dateCustom" hidden>
@@ -91,10 +100,7 @@
         <button type="button" class="ghost" id="themeLight">Lys</button>
       </div>
       <button type="button" class="ghost" id="refreshBtn">Oppdater loppemarked</button>
-      <div class="refresh-track" id="refreshTrack" hidden>
-        <div class="refresh-fill" id="refreshFill"></div>
-        <span id="refreshPct">0%</span>
-      </div>
+      <p class="panel-hint">Henter siste liste over loppemarked. Fremdrift vises oppe ved kartet.</p>
     </aside>
 
     <aside id="favPanel" class="panel" hidden>
@@ -108,6 +114,6 @@
     <footer>© OpenStreetMap</footer>
     <script src="./vendor/leaflet.js"></script>
     <script>window.LOPPIS_OFFLINE=true;</script>
-    <script src="./app.js?v=5" type="module"></script>
+    <script src="./app.js?v=6" type="module"></script>
   </body>
 </html>

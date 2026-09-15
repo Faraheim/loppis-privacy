@@ -1,4 +1,4 @@
-const CACHE = 'loppis-pwa-v5';
+const CACHE = 'loppis-pwa-v6';
 const SHELL = [
   './',
   './index.html',
@@ -40,10 +40,16 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((res) => {
+        if (!res.ok) return res;
+        const dest = url.pathname.endsWith('offline-store.json')
+          ? new Request('./offline-store.json')
+          : event.request;
         const copy = res.clone();
-        void caches.open(CACHE).then((c) => c.put(event.request, copy));
+        void caches.open(CACHE).then((c) => c.put(dest, copy));
         return res;
       })
-      .catch(() => caches.match(event.request)),
+      .catch(() =>
+        caches.match(event.request).then((hit) => hit || caches.match('./offline-store.json')),
+      ),
   );
 });

@@ -113,6 +113,19 @@ let map;
 let layer;
 let selected = null;
 let q = '';
+let nearKm = 0;
+let userLat = null;
+let userLon = null;
+let didFitMap = false;
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function todayOslo(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo' }).format(now);
@@ -187,6 +200,11 @@ function qs(extra = {}) {
   });
   if (kindsSel.size) u.set('kinds', [...kindsSel].join(','));
   if (q.trim()) u.set('q', q.trim());
+  if (nearKm > 0 && userLat != null && userLon != null) {
+    u.set('nearLat', String(userLat));
+    u.set('nearLon', String(userLon));
+    u.set('radiusKm', String(nearKm));
+  }
   const df = currentDateFilter();
   if (df.from) u.set('from', df.from);
   if (df.to) u.set('to', df.to);
@@ -309,7 +327,9 @@ function renderSheet(place, source, links) {
     a.textContent = label;
     box.append(a);
   };
-  add(place.attrs?.website || place.deepLink, 'Hjemmeside');
+  add(place.attrs?.website, 'Hjemmeside');
+  const fb = place.deepLink && /facebook\.com/i.test(place.deepLink) ? place.deepLink : null;
+  if (fb && fb !== place.attrs?.website && fb !== place.sourceUrl) add(fb, 'Facebook');
   add(place.sourceUrl, source?.name || 'Kilde');
   add(links?.directions, 'Veibeskrivelse');
   add(links?.streetView, 'Street View');
@@ -392,6 +412,9 @@ function mapParams() {
     dateFrom: df.from || null,
     dateTo: df.to || null,
     datedOnly: Boolean(df.dated),
+    nearLat: nearKm > 0 && userLat != null ? userLat : undefined,
+    nearLon: nearKm > 0 && userLon != null ? userLon : undefined,
+    radiusKm: nearKm > 0 ? nearKm : undefined,
   };
 }
 
@@ -408,9 +431,7 @@ async function load() {
       });
     }
     const features = mapRes.features || [];
-    statusEl.textContent = offline
-      ? `${mapRes.meta?.count ?? 0} treff · ${offlinePlaceCount()} i katalogen`
-      : `${mapRes.meta?.count ?? 0} treff · ${API}`;
+    statusEl.textContent = `${mapRes.meta?.count ?? 0} treff`;
     renderList(features);
     ensureMap();
     map.invalidateSize();
@@ -427,7 +448,7 @@ async function load() {
         fillOpacity: 0.85,
       })
         .bindPopup(
-          `<strong>${f.properties.name}</strong><br/>${f.properties.kindLabel || ''}<br/><button type="button" data-id="${f.properties.id}">Mer info</button>`,
+          `<strong>${escapeHtml(f.properties.name)}</strong><br/>${escapeHtml(f.properties.kindLabel || '')}<br/><button type="button" data-id="${escapeHtml(f.properties.id)}">Mer info</button>`,
         )
         .on('click', (ev) => {
           try {
@@ -449,34 +470,44 @@ async function load() {
         })
         .addTo(layer);
     }
-    if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 12 });
+    if (bounds.length && !didFitMap) {
+      didFitMap = true;
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: 12 });
+    }
   } catch (err) {
-    statusEl.textContent = `API nede (${API})`;
-    listEl.innerHTML = `<div class="empty">Klarte ikke å hente data. Start API: <code>cd loppis && npm run api</code> (port 8795).</div>`;
+    statusEl.textContent = 'Klarte ikke å hente data.';
+    listEl.innerHTML = '<div class="empty">Klarte ikke å hente data. Prøv oppdater.</div>';
   }
 }
 
 function setRefreshUi(running, percent, label) {
   const btn = document.getElementById('refreshBtn');
+  const chrome = document.getElementById('refreshChromeBtn');
   const track = document.getElementById('refreshTrack');
   const fill = document.getElementById('refreshFill');
   const pct = document.getElementById('refreshPct');
   btn.disabled = running;
   btn.textContent = running ? `${t('refresh')}…` : t('refresh');
+  chrome.disabled = running;
+  chrome.classList.toggle('spin', running);
   track.hidden = !running && !label;
   fill.style.width = `${Math.max(0, Math.min(100, percent || 0))}%`;
   pct.textContent = running ? `${Math.round(percent || 0)}%` : label || '';
 }
 
 async function refreshList() {
-  if (offline) {
-    statusEl.textContent = 'Katalog er innebygd. Ny versjon kommer som app-oppdatering.';
-    setRefreshUi(false, 0, '');
-    return;
-  }
-  setRefreshUi(true, 1, '');
-  statusEl.textContent = 'Oppdaterer loppemarked…';
+  setRefreshUi(true, 5, '');
+  statusEl.textContent = 'Henter ny liste…';
   try {
+    if (offline) {
+      setRefreshUi(true, 20, '');
+      const n = await loadOfflineStore(`./offline-store.json?t=${Date.now()}`);
+      setRefreshUi(true, 80, '');
+      await load();
+      statusEl.textContent = `Liste oppdatert — ${n} steder`;
+      setRefreshUi(false, 100, 'Ferdig');
+      return;
+    }
     const start = await fetch(`${API}/v1/refresh`, { method: 'POST' }).then((r) => r.json());
     setRefreshUi(true, start.percent || 1, '');
     let last = start;
@@ -498,7 +529,7 @@ async function refreshList() {
       setRefreshUi(false, last.percent || 0, 'Feilet');
     }
   } catch (err) {
-    statusEl.textContent = `Oppdatering feilet (${err.message || err})`;
+    statusEl.textContent = 'Klarte ikke å hente ny liste. Sjekk nettet.';
     setRefreshUi(false, 0, 'Feilet');
   }
 }
@@ -529,6 +560,7 @@ function applyChrome() {
   document.getElementById('themeDark').textContent = t('dark');
   document.getElementById('themeLight').textContent = t('light');
   document.getElementById('refreshBtn').textContent = t('refresh');
+  document.getElementById('refreshChromeBtn').setAttribute('aria-label', t('refresh'));
   document.getElementById('favTitle').textContent = t('favorites');
   document.getElementById('favClose').textContent = t('done');
   document.getElementById('favBtn').setAttribute('aria-label', t('favorites'));
@@ -636,6 +668,8 @@ function locateMe() {
     (pos) => {
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
+      userLat = lat;
+      userLon = lon;
       ensureMap();
       if (userMarker) userMarker.remove();
       if (userRipple) userRipple.remove();
@@ -660,6 +694,7 @@ function locateMe() {
         }
       }, 1400);
       map.setView([lat, lon], 12);
+      if (nearKm > 0) void load();
       finish();
     },
     () => {
@@ -697,7 +732,6 @@ async function boot() {
   if (offline) {
     try {
       await loadOfflineStore();
-      document.getElementById('refreshBtn').hidden = true;
     } catch (err) {
       statusEl.textContent = `Klarte ikke å laste katalogen (${err.message || err})`;
       return;
@@ -730,6 +764,21 @@ async function boot() {
   document.getElementById('sheetClose').addEventListener('click', closeSheet);
   document.getElementById('sheetFav').addEventListener('click', toggleFavFromSheet);
   document.getElementById('refreshBtn').addEventListener('click', () => void refreshList());
+  document.getElementById('refreshChromeBtn').addEventListener('click', () => void refreshList());
+  const kmRange = document.getElementById('kmRange');
+  const kmLabel = document.getElementById('kmLabel');
+  kmRange.addEventListener('input', () => {
+    nearKm = Number(kmRange.value) || 0;
+    kmLabel.textContent = nearKm ? `${nearKm} km` : 'Avstand av';
+  });
+  kmRange.addEventListener('change', () => {
+    nearKm = Number(kmRange.value) || 0;
+    kmLabel.textContent = nearKm ? `${nearKm} km` : 'Avstand av';
+    if (nearKm > 0 && (userLat == null || userLon == null)) {
+      locateMe();
+    }
+    void load();
+  });
   document.getElementById('settingsBtn').addEventListener('click', () => {
     document.getElementById('favPanel').hidden = true;
     const p = document.getElementById('settingsPanel');
@@ -764,7 +813,7 @@ async function boot() {
     if (dial) dial.style.transform = `rotate(${-heading}deg)`;
   });
   void load();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=5');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=6');
 }
 
 void boot();

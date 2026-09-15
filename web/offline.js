@@ -55,6 +55,24 @@ function placeMatchesDateFilter(place, filter = {}) {
   return dates.some((d) => d >= start && d <= end);
 }
 
+function stripPersonNames(text) {
+  return String(text || '')
+    .replace(/\s*\([^)]*\b[A-ZÆØÅ][a-zæøå]+(?:\s+[A-ZÆØÅ][a-zæøå]+){1,3}\b[^)]*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 function parseBBox(raw) {
   if (!raw) return null;
   const parts = String(raw)
@@ -83,7 +101,10 @@ export async function loadOfflineStore(url = './offline-store.json') {
   const data = await res.json();
   store = {
     places: Array.isArray(data.places) ? data.places : [],
-    sources: Array.isArray(data.sources) ? data.sources : [],
+    sources: (Array.isArray(data.sources) ? data.sources : []).map((s) => ({
+      ...s,
+      attribution: stripPersonNames(s.attribution || ''),
+    })),
     updatedAt: data.updatedAt || new Date().toISOString(),
   };
   return store.places.length;
@@ -144,6 +165,17 @@ export function offlineMap(params = {}) {
     );
   }
   if (bbox) places = places.filter((p) => pointInBBox(p.lat, p.lon, bbox));
+  if (
+    Number.isFinite(params.nearLat) &&
+    Number.isFinite(params.nearLon) &&
+    Number.isFinite(params.radiusKm) &&
+    params.radiusKm > 0
+  ) {
+    const maxM = params.radiusKm * 1000;
+    places = places.filter(
+      (p) => haversineMeters(params.nearLat, params.nearLon, p.lat, p.lon) <= maxM,
+    );
+  }
   if (q) {
     places = places.filter((p) => {
       const hay = [
