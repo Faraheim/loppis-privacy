@@ -1,4 +1,4 @@
-import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js?v=9';
+import { loadOfflineStore, offlineMap, offlinePlace, offlinePlaceCount, useOfflinePwa, getCatalogSnapshot, applyOfflineStore, persistOverlay } from './offline.js?v=10';
 import {
   catalogFromFetched,
   HOOPLA_CITIES,
@@ -6,7 +6,7 @@ import {
   isGitCatalogUrl,
   LIVE_FETCH_HEADERS,
   LIVE_HTML_SOURCES,
-} from './shared/liveCalendars.js?v=9';
+} from './shared/liveCalendars.js?v=10';
 
 const API = (window.LOPPIS_API || localStorage.getItem('loppisApi') || 'http://127.0.0.1:8795').replace(
   /\/$/,
@@ -506,7 +506,7 @@ function setRefreshUi(running, percent, label) {
 async function fetchPublicText(url) {
   if (isGitCatalogUrl(url)) throw new Error('git_catalog_forbidden');
   const res = await fetch(url, {
-    headers: LIVE_FETCH_HEADERS,
+    headers: { Accept: LIVE_FETCH_HEADERS.Accept },
     signal: AbortSignal.timeout?.(25_000),
   });
   if (!res.ok) throw new Error(`http ${res.status}`);
@@ -516,7 +516,7 @@ async function fetchPublicText(url) {
 async function fetchPublicJson(url) {
   if (isGitCatalogUrl(url)) throw new Error('git_catalog_forbidden');
   const res = await fetch(url, {
-    headers: { ...LIVE_FETCH_HEADERS, Accept: 'application/json' },
+    headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout?.(25_000),
   });
   if (!res.ok) throw new Error(`http ${res.status}`);
@@ -568,7 +568,7 @@ async function refreshList() {
       }
       bump(`Hoopla ${city}`);
     });
-    if (hooplaOk < Math.ceil(HOOPLA_CITIES.length / 2)) failedSourceIds.push('hoopla');
+    if (hooplaOk !== HOOPLA_CITIES.length) failedSourceIds.push('hoopla');
     const htmlOk = LIVE_HTML_SOURCES.filter((s) => htmlBySource[s.id]).length;
     if (!htmlOk && !hooplaOk) {
       statusEl.textContent = 'Klarte ikke å hente kalendere. Sjekk nettet.';
@@ -587,23 +587,7 @@ async function refreshList() {
     persistOverlay(store);
     await load();
     const fleas = store.places.filter((p) => p.attrs?.kind === 'flea_market').length;
-    const sourcesOk = htmlOk + (hooplaOk >= Math.ceil(HOOPLA_CITIES.length / 2) ? 1 : 0);
-    statusEl.textContent = fleas
-      ? `Liste oppdatert — ${n} steder (${fleas} loppemarked, ${sourcesOk} kilder)`
-      : `Liste oppdatert — ${n} steder (${sourcesOk} kilder)`;
-    setRefreshUi(true, 92, 'Oppdaterer kart');
-    const { store } = catalogFromFetched({
-      htmlBySource,
-      hooplaByCity,
-      localPlaces: local.places,
-      localSources: local.sources,
-      failedSourceIds,
-    });
-    const n = applyOfflineStore(store);
-    persistOverlay(store);
-    await load();
-    const fleas = store.places.filter((p) => p.attrs?.kind === 'flea_market').length;
-    const sourcesOk = htmlOk + (hooplaOk >= Math.ceil(HOOPLA_CITIES.length / 2) ? 1 : 0);
+    const sourcesOk = htmlOk + (hooplaOk === HOOPLA_CITIES.length ? 1 : 0);
     statusEl.textContent = fleas
       ? `Liste oppdatert — ${n} steder (${fleas} loppemarked, ${sourcesOk} kilder)`
       : `Liste oppdatert — ${n} steder (${sourcesOk} kilder)`;
@@ -897,7 +881,7 @@ async function boot() {
     if (dial) dial.style.transform = `rotate(${-heading}deg)`;
   });
   void load();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=9');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=10');
 }
 
 void boot();

@@ -330,20 +330,7 @@ export function parseLoppemarkedene(html) {
     const lat = Number(row.lat);
     const lon = Number(row.lng ?? row.lon);
     if (!title || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-    const years = [...content.matchAll(/20(2[6-9]|[3-9]\d)/g)].map((x) => Number(x[0]));
-    if (!years.length) continue;
-    const dates = [];
-    const re =
-      /(\d{1,2})(?:\s*og\s*(\d{1,2}))?\.?\s*(januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)/gi;
-    let dm;
-    while ((dm = re.exec(content))) {
-      const month = monthNum(dm[3]);
-      const year = years[0];
-      if (!month) continue;
-      dates.push(isoDate(year, month, Number(dm[1])));
-      if (dm[2]) dates.push(isoDate(year, month, Number(dm[2])));
-    }
-    const uniq = uniqueDates(dates);
+    const uniq = datesFromSourceText(content);
     if (!uniq.length) continue;
     const fb = content.match(/https?:\/\/(?:www\.)?facebook\.com\/[^\s<"]+/i);
     const site = content.match(/https?:\/\/(?!www\.facebook\.com|instagram\.com)[^\s<"]+/i);
