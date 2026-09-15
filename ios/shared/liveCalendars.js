@@ -105,6 +105,11 @@ export function isGitCatalogUrl(url) {
   return false;
 }
 
+export const LIVE_FETCH_HEADERS = {
+  Accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
+  'User-Agent': 'Loppis/0.1.2 (Norway flea-market map; user-device calendar pull)',
+};
+
 export function hooplaEventsUrl(city) {
   return `https://api.hoopla.no/api/public/v3.1/events?c=${encodeURIComponent(city)}`;
 }
@@ -225,12 +230,17 @@ export function parseLoppify(html) {
     /<a class="lp-landing-card" href="([^"]+)">[\s\S]*?lp-landing-card__date">([^<]+)<[\s\S]*?lp-landing-card__name">([^<]+)<[\s\S]*?lp-landing-card__sub">([^<]+)</g;
   let m;
   while ((m = re.exec(html))) {
-    const href = new URL(m[1], 'https://loppify.market/').href;
+    let href;
+    try {
+      href = new URL(m[1], 'https://loppify.market/').href;
+    } catch {
+      continue;
+    }
     const dateText = decodeHtml(m[2]);
     const title = decodeHtml(m[3]);
     const sub = decodeHtml(m[4]);
     const [city, type] = sub.split('·').map((s) => s.trim());
-    const dates = datesFromSourceText(dateText);
+    const dates = loppifyDates(dateText, title);
     if (!title || !dates.length) continue;
     out.push({
       sourceId: 'loppify',
@@ -245,6 +255,22 @@ export function parseLoppify(html) {
     });
   }
   return out;
+}
+
+function yearInSourceText(text) {
+  const m = String(text || '').match(/\b(20\d{2})\b/);
+  return m ? Number(m[1]) : null;
+}
+
+function loppifyDates(dateText, title) {
+  const fromDate = datesFromSourceText(dateText);
+  if (fromDate.length) return fromDate;
+  const year = yearInSourceText(`${dateText} ${title}`);
+  if (!year) return [];
+  const dateLine = String(dateText || '')
+    .replace(/·.*/, '')
+    .trim();
+  return datesFromSourceText(`${dateLine} ${year}`);
 }
 
 export function parseFlea(html) {
@@ -357,7 +383,7 @@ export function parseHooplaEvents(body, city) {
     const end = row.end ? new Date(row.end) : start;
     const lat = Number(row.location?.coordinates?.latitude);
     const lon = Number(row.location?.coordinates?.longitude);
-    const dates = uniqueDates([start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]);
+    const dates = uniqueDates([todayOslo(start), todayOslo(end)]);
     const url = row.event_sales_page_url || null;
     out.push({
       sourceId: 'hoopla',
@@ -535,14 +561,31 @@ export function catalogFromFetched({
   today = todayOslo(),
 } = {}) {
   const rows = [];
+  const failed = [...failedSourceIds];
   for (const src of LIVE_HTML_SOURCES) {
-    if (failedSourceIds.includes(src.id)) continue;
+    if (failed.includes(src.id)) continue;
     const html = htmlBySource[src.id];
-    if (html) rows.push(...src.parse(html));
+    if (!String(html || '').trim()) {
+      failed.push(src.id);
+      continue;
+    }
+    try {
+      rows.push(...src.parse(html));
+    } catch {
+      failed.push(src.id);
+    }
   }
-  if (!failedSourceIds.includes('hoopla')) {
-    for (const [city, body] of Object.entries(hooplaByCity || {})) {
-      rows.push(...parseHooplaEvents(body, city));
+  if (!failed.includes('hoopla')) {
+    const cities = Object.entries(hooplaByCity || {});
+    if (!cities.length) failed.push('hoopla');
+    else {
+      for (const [city, body] of cities) {
+        try {
+          rows.push(...parseHooplaEvents(body, city));
+        } catch {
+          /* skip one city */
+        }
+      }
     }
   }
   const geocoded = attachKnownGeo(rows, localPlaces);
@@ -552,10 +595,15 @@ export function catalogFromFetched({
     if (!bySource[p.sourceId]) bySource[p.sourceId] = [];
     bySource[p.sourceId].push(p);
   }
+  for (const src of LIVE_HTML_SOURCES) {
+    if (failed.includes(src.id)) continue;
+    if (!(bySource[src.id] || []).length) failed.push(src.id);
+  }
+  if (!failed.includes('hoopla') && !(bySource.hoopla || []).length) failed.push('hoopla');
   return mergeLiveCalendars(
     { places: localPlaces, sources: localSources },
     bySource,
-    failedSourceIds,
+    failed,
   );
 }
 
